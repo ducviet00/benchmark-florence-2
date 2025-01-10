@@ -5,11 +5,12 @@ import torch
 from PIL import Image
 from transformers import AutoProcessor, AutoModelForCausalLM
 
+
+torch._inductor.config.conv_1x1_as_mm = True
 torch._inductor.config.coordinate_descent_tuning = True
-torch._inductor.config.triton.unique_kernel_names = True
-# Experimental features to reduce compilation times, will be on by default in future
-torch._inductor.config.fx_graph_cache = True
-torch._functorch.config.enable_autograd_cache = True
+torch._inductor.config.epilogue_fusion = True
+torch._inductor.config.coordinate_descent_check_all_directions = True
+torch.set_float32_matmul_precision('high')
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
@@ -28,7 +29,7 @@ model = AutoModelForCausalLM.from_pretrained(
             attn_implementation="flash_attention_2",
             trust_remote_code=True,
         )
-model = model.to(device).eval()
+model = model.to(device)
 
 processor = AutoProcessor.from_pretrained(
     "microsoft/Florence-2-large", trust_remote_code=True,
@@ -51,8 +52,7 @@ print("pixel_values:", pixel_values.shape)
 
 if device == "cuda":
     print("Compiling the model")
-    model.to(memory_format=torch.channels_last)
-    model = torch.compile(model, mode="max-autotune", fullgraph=True)
+    model = torch.compile(model, mode="reduce-overhead", fullgraph=True)
 
 # WARM UP    
 with torch.inference_mode():
