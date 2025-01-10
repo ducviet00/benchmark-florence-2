@@ -11,16 +11,17 @@ torch._inductor.config.triton.unique_kernel_names = True
 torch._inductor.config.fx_graph_cache = True
 torch._functorch.config.enable_autograd_cache = True
 
-device = "cuda:0" if torch.cuda.is_available() else "cpu"
-torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+device = "cuda" if torch.cuda.is_available() else "cpu"
+torch_dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float32
 
-model = (
-    AutoModelForCausalLM.from_pretrained(
-        "microsoft/Florence-2-large", torch_dtype=torch_dtype, trust_remote_code=True,
-    )
-    .eval()
-    .to(device)
-)
+model = AutoModelForCausalLM.from_pretrained(
+            "microsoft/Florence-2-large",
+            torch_dtype=torch_dtype,
+            attn_implementation="flash_attention_2",
+            trust_remote_code=True,
+        )
+model = model.to(device).eval()
+
 processor = AutoProcessor.from_pretrained(
     "microsoft/Florence-2-large", trust_remote_code=True,
 )
@@ -44,8 +45,8 @@ if device == "cuda:0":
     model.to(memory_format=torch.channels_last)
     model = torch.compile(model, mode="max-autotune", fullgraph=True)
 
-for _ in range(5):
-    with torch.inference_mode():
+with torch.inference_mode():
+    for _ in range(5):
         generated_ids = model.generate(
             input_ids=input_ids,
             pixel_values=pixel_values,
@@ -59,8 +60,8 @@ print("generated_ids:", generated_ids.shape)
 
 
 durations = []
-for _ in range(25):
-    with torch.inference_mode():
+with torch.inference_mode():
+    for _ in range(25):
         stime = time.time()
         generated_ids = model.generate(
             input_ids=input_ids,

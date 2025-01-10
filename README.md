@@ -8,6 +8,8 @@ docker run --gpus all -it --rm -v ${PWD}:/workspace/ pytorch/pytorch:2.5.1-cuda1
 Inside docker
 
 ```
+apt update && apt install git
 pip install -r requirements.txt
+pip install flash-attn --no-build-isolation
 python infer.py
 ```
