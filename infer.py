@@ -49,7 +49,8 @@ pixel_values = inputs["pixel_values"]
 print("input_ids:", input_ids.shape)
 print("pixel_values:", pixel_values.shape)
 
-if device == "cuda:0":
+if device == "cuda":
+    print("Compiling the model")
     model.to(memory_format=torch.channels_last)
     model = torch.compile(model, mode="max-autotune", fullgraph=True)
 
