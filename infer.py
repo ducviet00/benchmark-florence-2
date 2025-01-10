@@ -45,8 +45,10 @@ inputs = processor(text=prompt, images=image, return_tensors="pt").to(
     device, torch_dtype
 )
 
-input_ids = inputs["input_ids"].repeat(1, 5)
-pixel_values = inputs["pixel_values"]
+batch_size = 8
+
+input_ids = inputs["input_ids"].repeat(batch_size, 5).contiguous()
+pixel_values = inputs["pixel_values"].repeat(batch_size, 1, 1, 1).contiguous()
 
 print("input_ids:", input_ids.shape)
 print("pixel_values:", pixel_values.shape)
@@ -94,7 +96,7 @@ with torch.inference_mode(), amp_context:
         device_sync(device=device)
         duration = time.perf_counter() - t0
         durations.append(duration)
-        print(f"len: {generated_ids.shape[1]} - perf: {generated_ids.shape[1] / duration} tok /s")
+        print(f"len: {generated_ids.numel()} - perf: {generated_ids.numel() / duration} tok /s")
 
 
 print(sum(durations) / len(durations))
