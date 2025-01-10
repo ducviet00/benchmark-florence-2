@@ -14,6 +14,14 @@ torch._functorch.config.enable_autograd_cache = True
 device = "cuda" if torch.cuda.is_available() else "cpu"
 torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
 
+def device_sync(device):
+    if "cuda" in device:
+        torch.cuda.synchronize(device)
+    elif ("cpu" in device) or ("mps" in device):
+        pass
+    else:
+        print(f"device={device} is not yet suppported")
+
 model = AutoModelForCausalLM.from_pretrained(
             "microsoft/Florence-2-large",
             torch_dtype=torch_dtype,
@@ -63,7 +71,7 @@ print("generated_ids:", generated_ids.shape)
 durations = []
 with torch.inference_mode():
     for _ in range(25):
-        stime = time.time()
+        t0 = time.perf_counter()
         generated_ids = model.generate(
             input_ids=input_ids,
             pixel_values=pixel_values,
@@ -72,7 +80,8 @@ with torch.inference_mode():
             num_beams=3,
             do_sample=False,
         )
-        duration = time.time() - stime
+        device_sync(device=device)
+        duration = time.perf_counter() - t0
         durations.append(duration)
         print(f"len: {generated_ids.shape[1]} - perf: {generated_ids.shape[1] / duration} tok /s")
 
