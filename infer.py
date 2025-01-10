@@ -26,7 +26,7 @@ def device_sync(device):
 model = AutoModelForCausalLM.from_pretrained(
             "microsoft/Florence-2-large",
             torch_dtype=torch_dtype,
-            attn_implementation="flash_attention_2",
+            attn_implementation="flash_attention_2" if torch.cuda.is_available() else "sdpa",
             trust_remote_code=True,
         )
 model = model.to(device)
@@ -50,28 +50,36 @@ pixel_values = inputs["pixel_values"]
 print("input_ids:", input_ids.shape)
 print("pixel_values:", pixel_values.shape)
 
+amp_context = torch.cpu.amp.autocast(enabled=True)
 if device == "cuda":
     print("Compiling the model")
     model = torch.compile(model, mode="reduce-overhead", fullgraph=True)
+else:
+    import intel_extension_for_pytorch as ipex
+    ipex.enable_onednn_fusion(True)
+
+    with amp_context:
+        model = ipex.optimize(model, dtype=torch.bfloat16, inplace=True)
+        model = torch.compile(model, backend="ipex", mode="max-autotune")
+
 
 # WARM UP    
-with torch.inference_mode():
-    for _ in range(3):
-        generated_ids = model.generate(
-            input_ids=input_ids,
-            pixel_values=pixel_values,
-            max_new_tokens=1024,
-            min_new_tokens=1024,
-            num_beams=3,
-            do_sample=False,
-        )
+with torch.inference_mode(), amp_context:
+    generated_ids = model.generate(
+        input_ids=input_ids,
+        pixel_values=pixel_values,
+        max_new_tokens=1024,
+        min_new_tokens=1024,
+        num_beams=3,
+        do_sample=False,
+    )
 
 print("generated_ids:", generated_ids.shape)
 
 
 durations = []
-with torch.inference_mode():
-    for _ in range(25):
+with torch.inference_mode(), amp_context:
+    for _ in range(5):
         t0 = time.perf_counter()
         generated_ids = model.generate(
             input_ids=input_ids,
