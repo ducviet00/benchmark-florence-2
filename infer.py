@@ -12,7 +12,7 @@ torch._inductor.config.fx_graph_cache = True
 torch._functorch.config.enable_autograd_cache = True
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-torch_dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float32
+torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
 
 model = AutoModelForCausalLM.from_pretrained(
             "microsoft/Florence-2-large",
@@ -45,8 +45,9 @@ if device == "cuda:0":
     model.to(memory_format=torch.channels_last)
     model = torch.compile(model, mode="max-autotune", fullgraph=True)
 
+# WARM UP    
 with torch.inference_mode():
-    for _ in range(5):
+    for _ in range(3):
         generated_ids = model.generate(
             input_ids=input_ids,
             pixel_values=pixel_values,
@@ -73,7 +74,7 @@ with torch.inference_mode():
         )
         duration = time.time() - stime
         durations.append(duration)
-        print(f"{generated_ids.shape[1] / duration} tok /s")
+        print(f"len: {generated_ids.shape[1]} - perf: {generated_ids.shape[1] / duration} tok /s")
 
 
 print(sum(durations) / len(durations))
