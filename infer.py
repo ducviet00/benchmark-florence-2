@@ -1,5 +1,6 @@
 import time
 import requests
+from contextlib import nullcontext
 
 import torch
 from PIL import Image
@@ -54,6 +55,7 @@ amp_context = torch.cpu.amp.autocast(enabled=True)
 if device == "cuda":
     print("Compiling the model")
     model = torch.compile(model, mode="reduce-overhead", fullgraph=True)
+    amp_context = nullcontext()
 else:
     import intel_extension_for_pytorch as ipex
     ipex.enable_onednn_fusion(True)
